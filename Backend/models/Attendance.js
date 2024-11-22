@@ -6,6 +6,20 @@ const attendanceSchema = new mongoose.Schema({
     ref: 'Employee',
     required: true, // Links attendance to an employee
   },
+  firstName:{
+    type: String,
+    ref: 'Employee',
+    required: true,
+  },
+  lastName:{
+    type: String,
+    ref: 'Employee',
+    required: true,
+  },
+  branch: {
+    type: String,
+    required: [true, 'Enter the branch'],
+  },
   checkIn: {
     type: Date,
     default: null, // Will store check-in time

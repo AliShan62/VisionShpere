@@ -5,6 +5,7 @@ const companyRouter = require("./routers/companyRoutes");
 const AttendenceRoute = require("./routers/AttendenceRoute");  
 const shiftRoutes = require('./routers/shiftRoute');
 const branchRoutes = require("./routers/BranchesRoutes");  
+const ReportRoutes = require("./routers/ReportRoutes");  
 const MiddlewareForIfElse = require('./middleware/error');
 const bodyParser = require('body-parser');
 const cookieParser = require('cookie-parser');
@@ -40,6 +41,10 @@ app.use('/api/v1/shift',shiftRoutes);
 
 // Mount the branch routes at the `/api/v1/branches` prefix
 app.use('/api/v1/branches', branchRoutes);
+
+// Use the report routes for /api/reports endpoint
+app.use('/api/v1/reports', ReportRoutes);
+
 
 // Middleware to reduce if-else code in our application 
 app.use(MiddlewareForIfElse);
