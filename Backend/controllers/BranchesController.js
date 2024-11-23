@@ -3,7 +3,7 @@ const Branch = require('../models/Branches');
 
 // Create a new branch
 exports.createBranch = async (req, res) => {
-    try {
+    try { 
       const { name, tag, location } = req.body;
   
       if (!name || !tag || !location || !location.latitude || !location.longitude || !location.city) {
