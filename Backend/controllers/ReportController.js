@@ -4,7 +4,11 @@ const Attendance = require('../models/Attendance'); // The working hours report 
 const WorkingHoursReport = require('../models/Working_hours');
 const DailyHistoryReport = require('../models/DailyHistoryReport');
 const LocationHistory = require('../models/LocationHistory');
+const  SalaryReport= require('../models/SalaryModel');
+const  CheckInOutHistoryReport= require('../models/CheckInOutHistoryReport');
 
+
+const  LocationReport= require('../models/RealTimePath');
 
 // Controller function to generate "My Employees" report
 const generateMyEmployeesReport = async (req, res) => {
@@ -540,94 +544,494 @@ const calculateDistance = (coord1, coord2) => {
 };
 
 
-const exportToExcel = async (req, res) => {
+const generateSalaryReport = async (req, res) => {
   try {
-    const { reportId } = req.params;
+    // Extract filter values from query parameters
+    const { branchSelection, employeeSelection = "All", startDate, endDate } = req.query;
 
-    const report = await WorkingHoursReport.findById(reportId);
-
-    if (!report) {
-      return res.status(404).json({ message: 'Report not found' });
+    // Validate required parameters
+    if (!startDate || !endDate) {
+      return res.status(400).json({
+        message: 'Start date and end date are required.',
+        success: false,
+      });
     }
 
-    const workbook = new exceljs.Workbook();
-    const worksheet = workbook.addWorksheet('Working Hours Report');
+    // Construct the employee query
+    const employeeQuery = {};
+    if (branchSelection) employeeQuery.branch = branchSelection;
+    if (employeeSelection !== "All") employeeQuery._id = employeeSelection;
 
-    worksheet.columns = [
-      { header: 'First Name', key: 'firstName', width: 15 },
-      { header: 'Last Name', key: 'lastName', width: 15 },
-      { header: 'Hours of Work', key: 'hoursOfWork', width: 15 },
-      { header: 'Branch', key: 'branch', width: 15 },
-      { header: 'Date Added', key: 'dateAdded', width: 20 }
-    ];
+    // Fetch employees based on filters
+    const employees = await Employee.find(employeeQuery);
+    if (employees.length === 0) {
+      return res.status(404).json({
+        message: 'No employees found for the given filters.',
+        success: false,
+      });
+    }
 
-    report.reportData.forEach(data => {
-      worksheet.addRow(data);
+    // Fetch attendance records within the date range for filtered employees
+    const attendanceQuery = {
+      employeeId: { $in: employees.map((emp) => emp._id) },
+      date: { $gte: new Date(startDate), $lte: new Date(endDate) },
+    };
+    const attendanceRecords = await Attendance.find(attendanceQuery);
+
+    // Generate salary data
+    const reportData = employees.map((employee) => {
+      const employeeAttendance = attendanceRecords.filter(
+        (record) => record.employeeId.toString() === employee._id.toString()
+      );
+
+      const totalHours = employeeAttendance.reduce((sum, record) => sum + record.totalHours, 0);
+      const overtime = employeeAttendance.reduce((sum, record) => sum + record.overtime, 0);
+
+      // Calculate salary
+      const totalSalary = employee.salaryBased
+        ? employee.salary
+        : employee.hourlyWages * totalHours;
+
+      return {
+        employeeId: employee._id,
+        name: `${employee.firstName} ${employee.lastName}`,
+        branch: employee.branch,
+        totalHours,
+        overtime,
+        totalSalary,
+        salaryBased: employee.salaryBased,
+      };
     });
 
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', `attachment; filename=working_hours_report_${report._id}.xlsx`);
+    // Save the report in the database
+    const newReport = new SalaryReport({
+      generatedBy: "Admin", // Replace with `req.user.username` if authentication middleware is in use
+      filters: {
+        branch: branchSelection || "All",
+        startDate,
+        endDate,
+        employeeId: employeeSelection,
+      },
+      reportData,
+    });
 
-    await workbook.xlsx.write(res);
-    res.end();
+    await newReport.save();
+
+    // Respond with the report details
+    res.status(201).json({
+      message: 'Salary report generated successfully!',
+      reportId: newReport._id,
+      reportData,
+      success: true,
+    });
   } catch (error) {
-    console.error('Error exporting to Excel:', error);
-    return res.status(500).json({ message: 'Error exporting to Excel' });
+    console.error('Error generating salary report:', error.message);
+    res.status(500).json({
+      message: 'An error occurred while generating the salary report.',
+      error: error.message,
+      success: false,
+    });
   }
 };
 
-// Export report to PDF
-const exportToPDF = async (req, res) => {
+
+
+const generateLocationReport = async (req, res) => {
   try {
-    const { reportId } = req.params;
+    // Extract query parameters
+    const { branchSelection, employeeSelection = "All", startDate, endDate, reportType = "Location Report" } = req.query;
 
-    const report = await WorkingHoursReport.findById(reportId);
-
-    if (!report) {
-      return res.status(404).json({ message: 'Report not found' });
+    // Validate required parameters
+    if (!startDate || !endDate) {
+      return res.status(400).json({
+        message: 'Start date and end date are required.',
+        success: false,
+      });
     }
 
-    const html = `
-      <h1>Working Hours Report</h1>
-      <p><strong>Start Date:</strong> ${report.startDate}</p>
-      <p><strong>End Date:</strong> ${report.endDate}</p>
-      <table border="1">
-        <thead>
-          <tr>
-            <th>First Name</th>
-            <th>Last Name</th>
-            <th>Hours of Work</th>
-            <th>Branch</th>
-            <th>Date Added</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${report.reportData.map(data => `
-            <tr>
-              <td>${data.firstName}</td>
-              <td>${data.lastName}</td>
-              <td>${data.hoursOfWork}</td>
-              <td>${data.branch}</td>
-              <td>${data.dateAdded}</td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-    `;
+    // Parse startDate and endDate into Date objects
+    const start = new Date(startDate);
+    const end = new Date(endDate);
 
-    pdf.create(html).toStream((err, stream) => {
-      if (err) {
-        return res.status(500).json({ message: 'Error generating PDF' });
-      }
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename=working_hours_report_${report._id}.pdf`);
-      stream.pipe(res);
+    // Set the end date to the end of the day if needed (23:59:59)
+    end.setHours(23, 59, 59, 999);
+
+    // Construct employee query
+    const employeeQuery = {};
+    if (branchSelection && branchSelection !== "All") {
+      employeeQuery.branch = branchSelection;
+    }
+    if (employeeSelection !== "All") {
+      employeeQuery._id = employeeSelection;
+    }
+
+    // Fetch employees based on the query
+    const employees = await Employee.find(employeeQuery);
+    if (employees.length === 0) {
+      return res.status(404).json({
+        message: 'No employees found for the given filters.',
+        success: false,
+      });
+    }
+
+    // Static location data for now (This can be modified later as per actual data)
+    const staticLocationData = {
+      latitude: 37.7749, // Example: San Francisco latitude
+      longitude: -122.4194, // Example: San Francisco longitude
+      address: 'San Francisco, CA', // Example address
+    };
+
+    // Prepare report data with static location
+    const reportData = employees.map(employee => ({
+      employeeId: employee._id,
+      name: `${employee.firstName} ${employee.lastName}`,
+      branch: employee.branch,
+      latitude: staticLocationData.latitude,
+      longitude: staticLocationData.longitude,
+      address: staticLocationData.address,
+      time: new Date(),
+      map: `https://www.google.com/maps?q=${staticLocationData.latitude},${staticLocationData.longitude}`,
+    }));
+
+    // Save the report data
+    const newReport = new LocationReport({
+      generatedBy: "Admin",
+      filters: {
+        branch: branchSelection || "All",
+        startDate: start,
+        endDate: end,
+        employeeId: employeeSelection,
+      },
+      reportType,  // Add the reportType to the report
+      reportData,
+    });
+
+    await newReport.save();
+
+    // Respond with success
+    res.status(201).json({
+      message: 'Location report generated successfully!',
+      reportId: newReport._id,
+      reportData,
+      success: true,
     });
   } catch (error) {
-    console.error('Error exporting to PDF:', error);
-    return res.status(500).json({ message: 'Error exporting to PDF' });
+    console.error('Error generating location report:', error.message);
+    res.status(500).json({
+      message: 'An error occurred while generating the location report.',
+      error: error.message,
+      success: false,
+    });
   }
 };
+
+
+// const getCheckInOutHistoryReport = async (req, res) => {
+//   try {
+//     const { branchSelection, employeeSelection, startDate, endDate } = req.query;
+
+//     // Build dynamic match filters
+//     const matchFilters = {};
+
+//     if (branchSelection && branchSelection !== 'All') {
+//       matchFilters.branch = branchSelection;
+//     }
+
+//     if (employeeSelection && employeeSelection !== 'All') {
+//       matchFilters.employeeId = employeeSelection;
+//     }
+
+//     if (startDate && endDate) {
+//       matchFilters.date = {
+//         $gte: new Date(startDate).toISOString().split('T')[0],
+//         $lte: new Date(endDate).toISOString().split('T')[0],
+//       };
+//     } else if (startDate) {
+//       matchFilters.date = {
+//         $gte: new Date(startDate).toISOString().split('T')[0],
+//       };
+//     } else if (endDate) {
+//       matchFilters.date = {
+//         $lte: new Date(endDate).toISOString().split('T')[0],
+//       };
+//     }
+
+//     // Aggregation pipeline for the report
+//     const report = await Attendance.aggregate([
+//       { $match: matchFilters }, // Apply filters
+//       {
+//         $lookup: {
+//           from: 'employees', // Join with Employee collection
+//           localField: 'employeeId',
+//           foreignField: '_id',
+//           as: 'employeeDetails',
+//         },
+//       },
+//       { $unwind: '$employeeDetails' }, // Flatten employee details
+//       {
+//         $group: {
+//           _id: '$employeeId', // Group by employeeId
+//           firstName: { $first: '$employeeDetails.firstName' },
+//           lastName: { $first: '$employeeDetails.lastName' },
+//           branch: { $first: '$branch' },
+//           totalCheckIns: { $sum: 1 }, // Count total records (check-ins)
+//           totalCheckOuts: {
+//             $sum: { $cond: [{ $ne: ['$checkOut', 'Pending'] }, 1, 0] }, // Count records with check-out
+//           },
+//         },
+//       },
+//       {
+//         $project: {
+//           _id: 0, // Exclude _id from results
+//           employeeId: '$_id',
+//           firstName: 1,
+//           lastName: 1,
+//           branch: 1,
+//           totalCheckIns: 1,
+//           totalCheckOuts: 1,
+//         },
+//       },
+//     ]);
+
+//     if (!report.length) {
+//       return res.status(404).json({
+//         message: 'No attendance records found for the given criteria.',
+//         success: false,
+//       });
+//     }
+
+//     // Save the report in the CheckInOutHistoryReport collection
+//     const savedReport = await CheckInOutHistoryReport.create({
+//       branchSelection: branchSelection || 'All',
+//       employeeSelection: employeeSelection || 'All',
+//       startDate: startDate || null,
+//       endDate: endDate || null,
+//       reportData: report,
+//       generatedAt: new Date(),
+//     });
+
+//     // Return the report
+//     res.status(200).json({
+//       message: 'Check-In/Check-Out History Report generated and saved successfully.',
+//       success: true,
+//       data: savedReport,
+//     });
+//   } catch (error) {
+//     console.error('Error generating and saving Check-In/Check-Out History Report:', error);
+//     res.status(500).json({
+//       message: 'An error occurred while generating the report.',
+//       success: false,
+//     });
+//   }
+// };
+
+const getCheckInOutHistoryReport = async (req, res) => {
+  try {
+    const { branchSelection, employeeSelection, startDate, endDate } = req.query;
+
+    // Build dynamic match filters
+    const matchFilters = {};
+
+    // Handle branch selection
+    if (branchSelection && branchSelection !== 'All') {
+      matchFilters.branch = branchSelection;
+    }
+
+    // Handle employee selection
+    if (employeeSelection && employeeSelection !== 'All') {
+      matchFilters.employeeId = employeeSelection;
+    }
+
+    // Handle date range filters
+    if (startDate && endDate) {
+      matchFilters.date = {
+        $gte: new Date(startDate).toISOString(), // Convert to ISO string for comparison
+        $lte: new Date(endDate).toISOString(),
+      };
+    } else if (startDate) {
+      matchFilters.date = {
+        $gte: new Date(startDate).toISOString(),
+      };
+    } else if (endDate) {
+      matchFilters.date = {
+        $lte: new Date(endDate).toISOString(),
+      };
+    }
+
+    // Aggregation pipeline for the report
+    const report = await Attendance.aggregate([
+      { $match: matchFilters }, // Apply filters
+
+      // Lookup employee details
+      {
+        $lookup: {
+          from: 'employees', // Join with the Employee collection
+          localField: 'employeeId',
+          foreignField: '_id',
+          as: 'employeeDetails',
+        },
+      },
+      { $unwind: '$employeeDetails' }, // Flatten the employee details
+
+      // Group by employeeId and calculate check-ins and check-outs
+      {
+        $group: {
+          _id: '$employeeId',
+          firstName: { $first: '$employeeDetails.firstName' },
+          lastName: { $first: '$employeeDetails.lastName' },
+          branch: { $first: '$branch' },
+          totalCheckIns: { $sum: 1 }, // Count total records (check-ins)
+          totalCheckOuts: {
+            $sum: { $cond: [{ $ne: ['$checkOut', 'Pending'] }, 1, 0] }, // Count records with check-out
+          },
+        },
+      },
+
+      // Project the final output
+      {
+        $project: {
+          _id: 0, // Exclude _id
+          employeeId: '$_id',
+          firstName: 1,
+          lastName: 1,
+          branch: 1,
+          totalCheckIns: 1,
+          totalCheckOuts: 1,
+        },
+      },
+    ]);
+
+    // If no records are found
+    if (!report.length) {
+      return res.status(404).json({
+        message: 'No attendance records found for the given criteria.',
+        success: false,
+      });
+    }
+
+    // Save the report in the CheckInOutHistoryReport collection
+    const savedReport = await CheckInOutHistoryReport.create({
+      branchSelection: branchSelection || 'All',
+      employeeSelection: employeeSelection || 'All',
+      startDate: startDate || null,
+      endDate: endDate || null,
+      reportData: report,
+      generatedAt: new Date(),
+    });
+
+    // Return the report
+    res.status(200).json({
+      message: 'Check-In/Check-Out History Report generated and saved successfully.',
+      success: true,
+      data: savedReport,
+    });
+  } catch (error) {
+    console.error('Error generating and saving Check-In/Check-Out History Report:', error);
+    res.status(500).json({
+      message: 'An error occurred while generating the report.',
+      success: false,
+    });
+  }
+};
+
+
+
+
+
+
+
+
+
+
+
+// const exportToExcel = async (req, res) => {
+//   try {
+//     const { reportId } = req.params;
+
+//     const report = await WorkingHoursReport.findById(reportId);
+
+//     if (!report) {
+//       return res.status(404).json({ message: 'Report not found' });
+//     }
+
+//     const workbook = new exceljs.Workbook();
+//     const worksheet = workbook.addWorksheet('Working Hours Report');
+
+//     worksheet.columns = [
+//       { header: 'First Name', key: 'firstName', width: 15 },
+//       { header: 'Last Name', key: 'lastName', width: 15 },
+//       { header: 'Hours of Work', key: 'hoursOfWork', width: 15 },
+//       { header: 'Branch', key: 'branch', width: 15 },
+//       { header: 'Date Added', key: 'dateAdded', width: 20 }
+//     ];
+
+//     report.reportData.forEach(data => {
+//       worksheet.addRow(data);
+//     });
+
+//     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+//     res.setHeader('Content-Disposition', `attachment; filename=working_hours_report_${report._id}.xlsx`);
+
+//     await workbook.xlsx.write(res);
+//     res.end();
+//   } catch (error) {
+//     console.error('Error exporting to Excel:', error);
+//     return res.status(500).json({ message: 'Error exporting to Excel' });
+//   }
+// };
+
+// // Export report to PDF
+// const exportToPDF = async (req, res) => {
+//   try {
+//     const { reportId } = req.params;
+
+//     const report = await WorkingHoursReport.findById(reportId);
+
+//     if (!report) {
+//       return res.status(404).json({ message: 'Report not found' });
+//     }
+
+//     const html = `
+//       <h1>Working Hours Report</h1>
+//       <p><strong>Start Date:</strong> ${report.startDate}</p>
+//       <p><strong>End Date:</strong> ${report.endDate}</p>
+//       <table border="1">
+//         <thead>
+//           <tr>
+//             <th>First Name</th>
+//             <th>Last Name</th>
+//             <th>Hours of Work</th>
+//             <th>Branch</th>
+//             <th>Date Added</th>
+//           </tr>
+//         </thead>
+//         <tbody>
+//           ${report.reportData.map(data => `
+//             <tr>
+//               <td>${data.firstName}</td>
+//               <td>${data.lastName}</td>
+//               <td>${data.hoursOfWork}</td>
+//               <td>${data.branch}</td>
+//               <td>${data.dateAdded}</td>
+//             </tr>
+//           `).join('')}
+//         </tbody>
+//       </table>
+//     `;
+
+//     pdf.create(html).toStream((err, stream) => {
+//       if (err) {
+//         return res.status(500).json({ message: 'Error generating PDF' });
+//       }
+//       res.setHeader('Content-Type', 'application/pdf');
+//       res.setHeader('Content-Disposition', `attachment; filename=working_hours_report_${report._id}.pdf`);
+//       stream.pipe(res);
+//     });
+//   } catch (error) {
+//     console.error('Error exporting to PDF:', error);
+//     return res.status(500).json({ message: 'Error exporting to PDF' });
+//   }
+// };
 
 
 
@@ -639,8 +1043,11 @@ const exportToPDF = async (req, res) => {
     generateWorkingHoursReport,
     generateDailyHistoryReport,
     generateLocationHistoryReport,
-    exportToExcel,
-    exportToPDF
+    generateSalaryReport,
+    generateLocationReport,
+    getCheckInOutHistoryReport
+    // exportToExcel,
+    // exportToPDF
 };
   
 

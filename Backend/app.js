@@ -46,6 +46,7 @@ app.use('/api/v1/branches', branchRoutes);
 app.use('/api/v1/reports', ReportRoutes);
 
 
+
 // Middleware to reduce if-else code in our application 
 app.use(MiddlewareForIfElse);
 

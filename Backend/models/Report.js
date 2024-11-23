@@ -9,6 +9,7 @@ const reportSchema = new mongoose.Schema({
     dateAdded: Date
   }],
   reportType: {
+    
     type: String,
     enum: ['My Employees', 'OtherReportType'],  // Define the valid report types
     required: true  // Ensure reportType is required
