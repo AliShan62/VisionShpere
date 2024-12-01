@@ -1,5 +1,7 @@
 const express = require('express');
-const { generateMyEmployeesReport,generateWorkingHoursReport,generateDailyHistoryReport ,generateLocationHistoryReport,generateSalaryReport,generateLocationReport,getCheckInOutHistoryReport} = require('../controllers/ReportController'); // 
+const { generateMyEmployeesReport,generateWorkingHoursReport,generateDailyHistoryReport ,generateLocationHistoryReport,generateSalaryReport,generateLocationReport,getCheckInOutHistoryReport,
+    getLateAttendanceReport
+} = require('../controllers/ReportController'); // 
 
 //Import the controller
 const router = express.Router();
@@ -21,5 +23,8 @@ router.get('/salary-report', generateSalaryReport);
 router.get('/location-report',generateLocationReport );
 
 router.get('/ChecksHistory',getCheckInOutHistoryReport );
+
+// Route to get the Late Attendance Report
+router.get('/get-late', getLateAttendanceReport);
 
 module.exports = router;

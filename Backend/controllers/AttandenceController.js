@@ -170,11 +170,11 @@ const checkInController = async (req, res) => {
 // };
 
 const checkOutController = async (req, res) => {
-  try {
+  try { 
     const { employeeId } = req.body;
 
     // Find today's attendance record
-    const attendance = await Attendance.findOne({
+    const attendance = await Attendance.findOne({ 
       employeeId,
       date: new Date().toISOString().split('T')[0], // Match only the date part
     });

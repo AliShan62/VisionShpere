@@ -8,6 +8,9 @@ const  SalaryReport= require('../models/SalaryModel');
 const  CheckInOutHistoryReport= require('../models/CheckInOutHistoryReport');
 
 
+const LateAttendanceReport = require('../models/Getlate'); // Import your report model
+
+
 const  LocationReport= require('../models/RealTimePath');
 
 // Controller function to generate "My Employees" report
@@ -636,6 +639,7 @@ const generateSalaryReport = async (req, res) => {
 
 
 
+
 const generateLocationReport = async (req, res) => {
   try {
     // Extract query parameters
@@ -729,6 +733,8 @@ const generateLocationReport = async (req, res) => {
 // const getCheckInOutHistoryReport = async (req, res) => {
 //   try {
 //     const { branchSelection, employeeSelection, startDate, endDate } = req.query;
+
+//     console.log(branchSelection, employeeSelection, startDate, endDate)
 
 //     // Build dynamic match filters
 //     const matchFilters = {};
@@ -825,58 +831,167 @@ const generateLocationReport = async (req, res) => {
 //   }
 // };
 
+// const getCheckInOutHistoryReport = async (req, res) => {
+//   try {
+//     const { branchSelection, employeeSelection, startDate, endDate } = req.query;
+
+//     // Build dynamic match filters
+//     const matchFilters = {};
+
+//     // Handle branch selection
+//     if (branchSelection && branchSelection !== 'All') {
+//       matchFilters.branch = branchSelection;
+//     }
+
+//     // Handle employee selection
+//     if (employeeSelection && employeeSelection !== 'All') {
+//       matchFilters.employeeId = employeeSelection;
+//     }
+
+//     // Handle date range filters
+//     if (startDate && endDate) {
+//       matchFilters.date = {
+//         $gte: new Date(startDate).toISOString(), // Convert to ISO string for comparison
+//         $lte: new Date(endDate).toISOString(),
+//       };
+//     } else if (startDate) {
+//       matchFilters.date = {
+//         $gte: new Date(startDate).toISOString(),
+//       };
+//     } else if (endDate) {
+//       matchFilters.date = {
+//         $lte: new Date(endDate).toISOString(),
+//       };
+//     }
+
+//     // Aggregation pipeline for the report
+//     const report = await Attendance.aggregate([
+//       { $match: matchFilters }, // Apply filters
+
+//       // Lookup employee details
+//       {
+//         $lookup: {
+//           from: 'employees', // Join with the Employee collection
+//           localField: 'employeeId',
+//           foreignField: '_id',
+//           as: 'employeeDetails',
+//         },
+//       },
+//       { $unwind: '$employeeDetails' }, // Flatten the employee details
+
+//       // Group by employeeId and calculate check-ins and check-outs
+//       {
+//         $group: {
+//           _id: '$employeeId',
+//           firstName: { $first: '$employeeDetails.firstName' },
+//           lastName: { $first: '$employeeDetails.lastName' },
+//           branch: { $first: '$branch' },
+//           totalCheckIns: { $sum: 1 }, // Count total records (check-ins)
+//           totalCheckOuts: {
+//             $sum: { $cond: [{ $ne: ['$checkOut', 'Pending'] }, 1, 0] }, // Count records with check-out
+//           },
+//         },
+//       },
+
+//       // Project the final output
+//       {
+//         $project: {
+//           _id: 0, // Exclude _id
+//           employeeId: '$_id',
+//           firstName: 1,
+//           lastName: 1,
+//           branch: 1,
+//           totalCheckIns: 1,
+//           totalCheckOuts: 1,
+//         },
+//       },
+//     ]);
+
+//     // If no records are found
+//     if (!report.length) {
+//       return res.status(404).json({
+//         message: 'No attendance records found for the given criteria.',
+//         success: false,
+//       });
+//     }
+
+//     // Save the report in the CheckInOutHistoryReport collection
+//     const savedReport = await CheckInOutHistoryReport.create({
+//       branchSelection: branchSelection || 'All',
+//       employeeSelection: employeeSelection || 'All',
+//       startDate: startDate || null,
+//       endDate: endDate || null,
+//       reportData: report,
+//       generatedAt: new Date(),
+//     });
+
+//     // Return the report
+//     res.status(200).json({
+//       message: 'Check-In/Check-Out History Report generated and saved successfully.',
+//       success: true,
+//       data: savedReport,
+//     });
+//   } catch (error) {
+//     console.error('Error generating and saving Check-In/Check-Out History Report:', error);
+//     res.status(500).json({
+//       message: 'An error occurred while generating the report.',
+//       success: false,
+//     });
+//   }
+// };
+
+
+
+const mongoose = require('mongoose'); // Import mongoose for ObjectId conversion
+
 const getCheckInOutHistoryReport = async (req, res) => {
   try {
     const { branchSelection, employeeSelection, startDate, endDate } = req.query;
 
+    console.log(branchSelection, employeeSelection, startDate, endDate);
+
     // Build dynamic match filters
     const matchFilters = {};
 
-    // Handle branch selection
     if (branchSelection && branchSelection !== 'All') {
       matchFilters.branch = branchSelection;
     }
 
-    // Handle employee selection
     if (employeeSelection && employeeSelection !== 'All') {
-      matchFilters.employeeId = employeeSelection;
+      // Use `new mongoose.Types.ObjectId` to convert to ObjectId
+      matchFilters.employeeId = new mongoose.Types.ObjectId(employeeSelection);
     }
 
-    // Handle date range filters
     if (startDate && endDate) {
       matchFilters.date = {
-        $gte: new Date(startDate).toISOString(), // Convert to ISO string for comparison
-        $lte: new Date(endDate).toISOString(),
+        $gte: new Date(startDate).toISOString().split('T')[0],
+        $lte: new Date(endDate).toISOString().split('T')[0],
       };
     } else if (startDate) {
       matchFilters.date = {
-        $gte: new Date(startDate).toISOString(),
+        $gte: new Date(startDate).toISOString().split('T')[0],
       };
     } else if (endDate) {
       matchFilters.date = {
-        $lte: new Date(endDate).toISOString(),
+        $lte: new Date(endDate).toISOString().split('T')[0],
       };
     }
 
     // Aggregation pipeline for the report
     const report = await Attendance.aggregate([
       { $match: matchFilters }, // Apply filters
-
-      // Lookup employee details
       {
         $lookup: {
-          from: 'employees', // Join with the Employee collection
+          from: 'employees', // Join with Employee collection
           localField: 'employeeId',
           foreignField: '_id',
           as: 'employeeDetails',
         },
       },
-      { $unwind: '$employeeDetails' }, // Flatten the employee details
-
-      // Group by employeeId and calculate check-ins and check-outs
+      { $unwind: '$employeeDetails' }, // Flatten employee details
       {
         $group: {
-          _id: '$employeeId',
+          _id: '$employeeId', // Group by employeeId
           firstName: { $first: '$employeeDetails.firstName' },
           lastName: { $first: '$employeeDetails.lastName' },
           branch: { $first: '$branch' },
@@ -886,11 +1001,9 @@ const getCheckInOutHistoryReport = async (req, res) => {
           },
         },
       },
-
-      // Project the final output
       {
         $project: {
-          _id: 0, // Exclude _id
+          _id: 0, // Exclude _id from results
           employeeId: '$_id',
           firstName: 1,
           lastName: 1,
@@ -901,7 +1014,6 @@ const getCheckInOutHistoryReport = async (req, res) => {
       },
     ]);
 
-    // If no records are found
     if (!report.length) {
       return res.status(404).json({
         message: 'No attendance records found for the given criteria.',
@@ -935,9 +1047,185 @@ const getCheckInOutHistoryReport = async (req, res) => {
 };
 
 
+const getLateAttendanceReport = async (req, res) => {
+  try {
+    const { branchSelection, employeeSelection, startDate, endDate } = req.query;
 
+    // Build dynamic match filters
+    const matchFilters = {};
 
+    if (branchSelection && branchSelection !== 'All') {
+      matchFilters.branch = branchSelection;
+    }
 
+    if (employeeSelection && employeeSelection !== 'All') {
+      matchFilters.employeeId = new mongoose.Types.ObjectId(employeeSelection);
+    }
+
+    if (startDate) {
+      const start = new Date(startDate);
+      start.setHours(0, 0, 0, 0); // Beginning of the day
+      matchFilters.date = { ...matchFilters.date, $gte: start };
+    }
+
+    if (endDate) {
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999); // End of the day
+      matchFilters.date = { ...matchFilters.date, $lte: end };
+    }
+
+    // Step 1: Fetch employees based on branch/employee filters
+    const employees = await Employee.find(
+      branchSelection && branchSelection !== 'All'
+        ? { branch: branchSelection }
+        : {}
+    );
+
+    // Filter down if employeeSelection is provided
+    const employeeIds = employees
+      .filter(
+        (emp) =>
+          !employeeSelection || emp._id.toString() === employeeSelection
+      )
+      .map((emp) => emp._id);
+
+    if (employeeIds.length === 0) {
+      return res.status(404).json({
+        message: 'No employees found for the given criteria.',
+        success: false,
+      });
+    }
+
+    // Step 2: Match attendance records for the relevant employees
+    matchFilters.employeeId = { $in: employeeIds };
+
+    const report = await Attendance.aggregate([
+      { $match: matchFilters },
+      {
+        $lookup: {
+          from: 'employees',
+          localField: 'employeeId',
+          foreignField: '_id',
+          as: 'employeeDetails',
+        },
+      },
+      { $unwind: '$employeeDetails' },
+      {
+        $lookup: {
+          from: 'shifts',
+          localField: 'employeeDetails.shiftId',
+          foreignField: '_id',
+          as: 'shiftDetails',
+        },
+      },
+      { $unwind: { path: '$shiftDetails', preserveNullAndEmptyArrays: true } },
+      {
+        $addFields: {
+          dayOfWeek: { $dayOfWeek: '$date' },
+          shiftDayInfo: {
+            $switch: {
+              branches: [
+                { case: { $eq: ['$dayOfWeek', 1] }, then: '$shiftDetails.daysOfWeek.Sun' },
+                { case: { $eq: ['$dayOfWeek', 2] }, then: '$shiftDetails.daysOfWeek.Mon' },
+                { case: { $eq: ['$dayOfWeek', 3] }, then: '$shiftDetails.daysOfWeek.Tue' },
+                { case: { $eq: ['$dayOfWeek', 4] }, then: '$shiftDetails.daysOfWeek.Wed' },
+                { case: { $eq: ['$dayOfWeek', 5] }, then: '$shiftDetails.daysOfWeek.Thu' },
+                { case: { $eq: ['$dayOfWeek', 6] }, then: '$shiftDetails.daysOfWeek.Fri' },
+                { case: { $eq: ['$dayOfWeek', 7] }, then: '$shiftDetails.daysOfWeek.Sat' },
+              ],
+              default: null,
+            },
+          },
+        },
+      },
+      {
+        $addFields: {
+          attendanceStartTime: {
+            $cond: {
+              if: { $and: ['$shiftDayInfo', { $eq: ['$shiftDayInfo.dayOff', false] }] },
+              then: {
+                $dateFromString: {
+                  dateString: {
+                    $concat: [
+                      { $dateToString: { format: '%Y-%m-%d', date: '$date' } },
+                      'T',
+                      '$shiftDayInfo.attendanceStart',
+                    ],
+                  },
+                },
+              },
+              else: null,
+            },
+          },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          name: { $concat: ['$employeeDetails.firstName', ' ', '$employeeDetails.lastName'] },
+          branch: '$employeeDetails.branch',
+          shift: '$shiftDetails.name',
+          date: 1,
+          checkInTime: 1,
+          attendanceStartTime: 1,
+          late: {
+            $cond: {
+              if: { $and: ['$attendanceStartTime', { $gt: ['$checkInTime', '$attendanceStartTime'] }] },
+              then: true,
+              else: false,
+            },
+          },
+          lateDuration: {
+            $cond: {
+              if: { $and: ['$attendanceStartTime', { $gt: ['$checkInTime', '$attendanceStartTime'] }] },
+              then: {
+                $divide: [
+                  { $subtract: ['$checkInTime', '$attendanceStartTime'] },
+                  60000,
+                ],
+              },
+              else: 0,
+            },
+          },
+        },
+      },
+      { $match: { attendanceStartTime: { $ne: null } } },
+    ]);
+
+    if (!report.length) {
+      return res.status(404).json({
+        message: 'No attendance records found for the given criteria.',
+        success: false,
+      });
+    }
+
+    // Save the generated report to the database
+    const savedReports = await LateAttendanceReport.insertMany(
+      report.map((item) => ({
+        name: item.name,
+        branch: item.branch,
+        shift: item.shift,
+        date: item.date,
+        attendanceStartTime: item.attendanceStartTime,
+        checkInTime: item.checkInTime,
+        late: item.late,
+        lateDuration: item.lateDuration,
+      }))
+    );
+
+    res.status(200).json({
+      message: 'Late Attendance Report generated and saved successfully.',
+      success: true,
+      data: savedReports,
+    });
+  } catch (error) {
+    console.error('Error generating Late Attendance Report:', error);
+    res.status(500).json({
+      message: 'An error occurred while generating the report.',
+      success: false,
+    });
+  }
+};
 
 
 
@@ -1045,7 +1333,8 @@ const getCheckInOutHistoryReport = async (req, res) => {
     generateLocationHistoryReport,
     generateSalaryReport,
     generateLocationReport,
-    getCheckInOutHistoryReport
+    getCheckInOutHistoryReport,
+    getLateAttendanceReport
     // exportToExcel,
     // exportToPDF
 };
