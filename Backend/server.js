@@ -19,6 +19,12 @@ process.on('uncaughtException', (error) => {
 //For give path of config.env file 
 dotenv.config({ path: "/.env" })
 
+
+
+app.get("/test", (req, res) => {
+    res.send("Hello world from  server!");
+  });
+
 //For Database Connection
 connectDatabase()
 

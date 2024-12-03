@@ -26,9 +26,6 @@ app.use(cors({
 // Set limit because I am sending images from frontend 
 app.use(express.json({ limit: '1000mb' }));
 
-app.get("/", (req, res) => {
-    res.send("Hello world from  server!");
-  });
 
 // This is parent route for my employees
 app.use('/api/v1/employees', employeeRoute);
