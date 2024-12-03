@@ -1,7 +1,7 @@
 const app = require('./app')
 const dotenv = require('dotenv')
 const colors = require('colors')
-const { connectDatabase } = require('./database')
+const connectDatabase  = require('./database')
 const error = require('./middleware/error')
 const cloudinary = require("cloudinary");
 
@@ -16,7 +16,7 @@ process.on('uncaughtException', (error) => {
 //console.log(youtube.com)
 
 //For give path of config.env file 
-dotenv.config({ path: "backend/config/config.env" })
+dotenv.config({ path: "config/.env" })
 
 //For Database Connection
 connectDatabase()
@@ -28,9 +28,10 @@ cloudinary.config({
     api_key: process.env.CLOUDINARY_API_KEY,
     api_secret: process.env.CLOUDINARY_API_SECRET,
   });
-
-const server = app.listen(process.env.PORT, () => {
-    console.log(`Server Is running Successfully on Port Number:${process.env.PORT}`.yellow)
+ 
+  
+const server = app.listen(process.env.PORT||4001, () => {
+    console.log(`Server Is running Successfully on Port Number:${process.env.PORT||4001}`.yellow)
 })
 
 
