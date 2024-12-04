@@ -12,7 +12,7 @@ router.post('/registration', addEmployeeController);
 router.post('/login', employeeLoginController);
 
 // getProfile
-router.get('/getprofile/:uniqueKey', getProfileController);
+router.get('/getprofile/:uniqueKey',authMiddleware, getProfileController);
 //updateProfile
 // Route to update employee profile by uniqueKey
 router.put('/updateprofile/:uniqueKey',authMiddleware, updateProfileController);
