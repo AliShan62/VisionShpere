@@ -192,29 +192,112 @@ const addEmployeeController = async (req, res) => {
 //   }
 // };
 
+// const employeeLoginController = async (req, res) => {
+//   try {
+//     const { uniqueKey } = req.body;
+
+//     // Validate if uniqueKey is provided
+//     if (!uniqueKey) {
+//       return res.status(400).json({
+//         message: 'Unique Key is required',
+//         success: false,
+//       });
+//     }
+
+//     // Find the employee by unique key
+//     const employee = await Employee.findOne({ uniqueKey });
+
+//     if (!employee) {
+//       return res.status(404).json({
+//         message: 'Employee not found with this unique key',
+//         success: false,
+//       });
+//     }
+
+//     // Save login activity with full employee details
+//     const loginActivity = new LoginActivity({
+//       uniqueKey: employee.uniqueKey,
+//       employeeDetails: {
+//         firstName: employee.firstName,
+//         lastName: employee.lastName,
+//         email: employee.email,
+//         phoneNumber: employee.phoneNumber,
+//         branch: employee.branch,
+//         shift: employee.shift,
+//         hourlyWages: employee.hourlyWages,
+//         salary: employee.salary,
+//         salaryBased: employee.salaryBased,
+//         totalSalary: employee.totalSalary,
+//         role: employee.role,
+//       },
+//     });
+
+//     await loginActivity.save(); // Save login activity to database
+
+//     // Create a JWT token
+//     const token = jwt.sign({ uniqueKey: employee.uniqueKey }, process.env.JWT_SECRET, { expiresIn: '1h' });
+
+//     // Set the token in the cookies
+//     res.cookie('authToken', token, {
+//       httpOnly: true,
+//       secure: process.env.NODE_ENV === 'production',
+//       maxAge: 3600000, // 1 hour
+//     });
+
+//     // Respond with employee details
+//     res.status(200).json({
+//       message: 'Login successful',
+//       success: true,
+//       employee: {
+//         firstName: employee.firstName,
+//         lastName: employee.lastName,
+//         email: employee.email,
+//         phoneNumber: employee.phoneNumber,
+//         branch: employee.branch,
+//         shift: employee.shift,
+//         hourlyWages: employee.hourlyWages,
+//         salary: employee.salary,
+//         salaryBased: employee.salaryBased,
+//         totalSalary: employee.totalSalary,
+//         role: employee.role,
+//         uniqueKey: employee.uniqueKey,
+//       },
+//     });
+//   } catch (error) {
+//     console.error('Error logging in employee:', error);
+//     res.status(500).json({
+//       message: 'An error occurred during login',
+//       success: false,
+//     });
+//   }
+// };
 const employeeLoginController = async (req, res) => {
   try {
     const { uniqueKey } = req.body;
 
-    // Validate if uniqueKey is provided
-    if (!uniqueKey) {
+    // Validate input
+    if (!uniqueKey || typeof uniqueKey !== 'string') {
       return res.status(400).json({
-        message: 'Unique Key is required',
+        message: 'Invalid unique key provided.',
         success: false,
       });
     }
 
-    // Find the employee by unique key
-    const employee = await Employee.findOne({ uniqueKey });
+    console.log('Login attempt for uniqueKey:', uniqueKey);
+
+    // Fetch employee details
+    const employee = await Employee.findOne({ uniqueKey }).select(
+      'firstName lastName email phoneNumber branch shift hourlyWages salary salaryBased totalSalary role uniqueKey'
+    );
 
     if (!employee) {
       return res.status(404).json({
-        message: 'Employee not found with this unique key',
+        message: 'Employee not found with this unique key.',
         success: false,
       });
     }
 
-    // Save login activity with full employee details
+    // Log activity
     const loginActivity = new LoginActivity({
       uniqueKey: employee.uniqueKey,
       employeeDetails: {
@@ -231,22 +314,26 @@ const employeeLoginController = async (req, res) => {
         role: employee.role,
       },
     });
+    await loginActivity.save();
 
-    await loginActivity.save(); // Save login activity to database
+    // Generate JWT
+    const token = jwt.sign(
+      { uniqueKey: employee.uniqueKey, role: employee.role },
+      process.env.JWT_SECRET,
+      { expiresIn: '1h' }
+    );
 
-    // Create a JWT token
-    const token = jwt.sign({ uniqueKey: employee.uniqueKey }, process.env.JWT_SECRET, { expiresIn: '1h' });
-
-    // Set the token in the cookies
+    // Set token in cookies
     res.cookie('authToken', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      maxAge: 3600000, // 1 hour
+      sameSite: 'strict',
+      maxAge: 3600000,
     });
 
     // Respond with employee details
     res.status(200).json({
-      message: 'Login successful',
+      message: 'Login successful.',
       success: true,
       employee: {
         firstName: employee.firstName,
@@ -264,9 +351,9 @@ const employeeLoginController = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Error logging in employee:', error);
+    console.error('Error logging in employee:', error.message, error.stack);
     res.status(500).json({
-      message: 'An error occurred during login',
+      message: 'An error occurred during login.',
       success: false,
     });
   }
