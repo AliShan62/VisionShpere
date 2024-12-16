@@ -335,8 +335,8 @@ const employeeLoginController = async (req, res) => {
     res.status(200).json({
       message: 'Login successful.',
       success: true,
-      token: token,
       employee: {
+        token: token,
         firstName: employee.firstName,
         lastName: employee.lastName,
         email: employee.email,
@@ -349,6 +349,7 @@ const employeeLoginController = async (req, res) => {
         totalSalary: employee.totalSalary,
         role: employee.role,
         uniqueKey: employee.uniqueKey,
+
       },
     });
   } catch (error) {
