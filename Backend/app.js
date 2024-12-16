@@ -20,7 +20,7 @@ const Employee = require('./models/Employee');
 
 app.use(cors({
     // origin: 'http://localhost:3000',
-    origin: 'http://10.96.42.40:3000',
+    origin: ['http://localhost:3000','http://10.96.42.40:3000'],
     credentials: true, // enable set cookie
 }));
 // Middleware for parsing JSON data in requests due to which we can access JSON data from req.body
