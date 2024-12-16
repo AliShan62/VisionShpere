@@ -335,6 +335,7 @@ const employeeLoginController = async (req, res) => {
     res.status(200).json({
       message: 'Login successful.',
       success: true,
+      token: token,
       employee: {
         firstName: employee.firstName,
         lastName: employee.lastName,
