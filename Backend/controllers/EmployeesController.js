@@ -364,7 +364,7 @@ const employeeLoginController = async (req, res) => {
 
 const getProfileController = async (req, res) => {
   try {
-    const { uniqueKey } = req.params; // Expecting the uniqueKey in the request params
+    const {uniqueKey, token} = req.query; // Expecting the uniqueKey in the request params
 
     // Find employee by unique key
     const employee = await Employee.findOne({ uniqueKey });
