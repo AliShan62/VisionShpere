@@ -274,6 +274,7 @@ const addEmployeeController = async (req, res) => {
 const employeeLoginController = async (req, res) => {
   try {
     const { uniqueKey } = req.body;
+ 
 
     // Validate input
     if (!uniqueKey || typeof uniqueKey !== 'string') {
@@ -283,7 +284,7 @@ const employeeLoginController = async (req, res) => {
       });
     }
 
-    console.log('Login attempt for uniqueKey:', uniqueKey);
+    
 
     // Fetch employee details
     const employee = await Employee.findOne({ uniqueKey }).select(
@@ -313,7 +314,11 @@ const employeeLoginController = async (req, res) => {
         totalSalary: employee.totalSalary,
         role: employee.role,
       },
+
+      
     });
+
+    
     await loginActivity.save();
 
     // Generate JWT
@@ -352,6 +357,8 @@ const employeeLoginController = async (req, res) => {
 
       },
     });
+
+    console.log('Login attempt for uniqueKey:', uniqueKey,token)
   } catch (error) {
     console.error('Error logging in employee:', error.message, error.stack);
     res.status(500).json({
@@ -365,8 +372,10 @@ const employeeLoginController = async (req, res) => {
 const getProfileController = async (req, res) => {
   try {
     const {uniqueKey, token} = req.query; // Expecting the uniqueKey in the request params
-
-    // Find employee by unique key
+ 
+         console.log(uniqueKey, token)
+    
+        // Find employee by unique key
     const employee = await Employee.findOne({ uniqueKey });
 
     if (!employee) {

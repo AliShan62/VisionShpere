@@ -38,8 +38,9 @@ const JWT = require('jsonwebtoken');
 const authMiddleware = async (req, res, next) => {
     try {
         const {uniqueKey, token} = req.query;
-        // const token = req. 
-       console.log(token)
+        
+    //    console.log(uniqueKey, token)
+
         if (!token) {
             return res.status(401).send({
                 message: 'Token missing',

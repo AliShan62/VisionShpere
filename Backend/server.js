@@ -42,12 +42,12 @@ const server = app.listen(process.env.PORT||4001, () => {
 })
 
 
-// this is errorhandler to for unhandled promise Rejection
-//this error we get when Invalid String Of DB_URL
-process.on('unhandledRejection', (error) => {
-    console.log(`Error: ${error.message}`.red);
-    console.log('Server Shutdown due to unhandled promise Rejection'.yellow);
-    server.close(() => {
-        process.exit(1);
-    });
-});
+// // this is errorhandler to for unhandled promise Rejection
+// //this error we get when Invalid String Of DB_URL
+// process.on('unhandledRejection', (error) => {
+//     console.log(`Error: ${error.message}`.red);
+//     console.log('Server Shutdown due to unhandled promise Rejection'.yellow);
+//     server.close(() => {
+//         process.exit(1);
+//     });
+// });
