@@ -1,17 +1,17 @@
-const express = require('express');
-const Employee = require('../models/Employee');
-const LoginActivity= require('../models/LoginActivity')
-const nodemailer = require('nodemailer');
-const jwt = require('jsonwebtoken');
-const cookieParser = require('cookie-parser');
+const express = require("express");
+const Employee = require("../models/Employee");
+const LoginActivity = require("../models/LoginActivity");
+const nodemailer = require("nodemailer");
+const jwt = require("jsonwebtoken");
+const cookieParser = require("cookie-parser");
 
-require('dotenv').config();
+require("dotenv").config();
 const router = express.Router();
 
 // Utility function to generate a 5-character alphanumeric unique key
 const generateUniqueKey = () => {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let uniqueKey = '';
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  let uniqueKey = "";
   for (let i = 0; i < 5; i++) {
     uniqueKey += chars.charAt(Math.floor(Math.random() * chars.length));
   }
@@ -21,7 +21,7 @@ const generateUniqueKey = () => {
 // Function to send email with employee details
 const sendEmail = async (email, uniqueKey) => {
   const transporter = nodemailer.createTransport({
-    service: 'gmail',
+    service: "gmail",
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASS,
@@ -31,15 +31,15 @@ const sendEmail = async (email, uniqueKey) => {
   const message = {
     from: process.env.EMAIL_USER,
     to: email,
-    subject: 'Welcome to the Location Tracking App',
+    subject: "Welcome to the Location Tracking App",
     text: `Welcome to our app! Your unique key is ${uniqueKey}. Please use this key to login to the location tracking app: http://yourapp.com/login`,
   };
 
   try {
     await transporter.sendMail(message);
-    console.log('Email sent successfully to ' + email);
+    console.log("Email sent successfully to " + email);
   } catch (error) {
-    console.error('Error sending email:', error);
+    console.error("Error sending email:", error);
   }
 };
 
@@ -47,7 +47,17 @@ const sendEmail = async (email, uniqueKey) => {
 const addEmployeeController = async (req, res) => {
   try {
     // Destructure employee data from the request body
-    const { firstName, lastName, email, phoneNumber, shift, branch, salaryBased, hourlyWages, salary } = req.body;
+    const {
+      firstName,
+      lastName,
+      email,
+      phoneNumber,
+      shift,
+      branch,
+      salaryBased,
+      hourlyWages,
+      salary,
+    } = req.body;
 
     // Check if employee already exists by email or phone number
     const existingEmployee = await Employee.findOne({
@@ -56,7 +66,8 @@ const addEmployeeController = async (req, res) => {
 
     if (existingEmployee) {
       return res.status(400).json({
-        message: "Employee with this email or phone number is already registered.",
+        message:
+          "Employee with this email or phone number is already registered.",
         success: false,
       });
     }
@@ -118,7 +129,6 @@ const addEmployeeController = async (req, res) => {
         totalSalary: newEmployee.totalSalary,
       },
     });
-
   } catch (error) {
     console.error("Error adding employee:", error);
     res.status(500).json({
@@ -274,26 +284,23 @@ const addEmployeeController = async (req, res) => {
 const employeeLoginController = async (req, res) => {
   try {
     const { uniqueKey } = req.body;
- 
 
     // Validate input
-    if (!uniqueKey || typeof uniqueKey !== 'string') {
+    if (!uniqueKey || typeof uniqueKey !== "string") {
       return res.status(400).json({
-        message: 'Invalid unique key provided.',
+        message: "Invalid unique key provided.",
         success: false,
       });
     }
 
-    
-
     // Fetch employee details
     const employee = await Employee.findOne({ uniqueKey }).select(
-      'firstName lastName email phoneNumber branch shift hourlyWages salary salaryBased totalSalary role uniqueKey'
+      "firstName lastName email phoneNumber branch shift hourlyWages salary salaryBased totalSalary role uniqueKey"
     );
 
     if (!employee) {
       return res.status(404).json({
-        message: 'Employee not found with this unique key.',
+        message: "Employee not found with this unique key.",
         success: false,
       });
     }
@@ -314,31 +321,28 @@ const employeeLoginController = async (req, res) => {
         totalSalary: employee.totalSalary,
         role: employee.role,
       },
-
-      
     });
 
-    
     await loginActivity.save();
 
     // Generate JWT
     const token = jwt.sign(
       { uniqueKey: employee.uniqueKey, role: employee.role },
       process.env.JWT_SECRET,
-      { expiresIn: '1h' }
+      { expiresIn: "1h" }
     );
 
     // Set token in cookies
-    res.cookie('authToken', token, {
+    res.cookie("authToken", token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
       maxAge: 3600000,
     });
 
     // Respond with employee details
     res.status(200).json({
-      message: 'Login successful.',
+      message: "Login successful.",
       success: true,
       employee: {
         token: token,
@@ -354,65 +358,71 @@ const employeeLoginController = async (req, res) => {
         totalSalary: employee.totalSalary,
         role: employee.role,
         uniqueKey: employee.uniqueKey,
-
       },
     });
 
-    console.log('Login attempt for uniqueKey:', uniqueKey,token)
+    console.log("Login attempt for uniqueKey:", uniqueKey, token);
   } catch (error) {
-    console.error('Error logging in employee:', error.message, error.stack);
+    console.error("Error logging in employee:", error.message, error.stack);
     res.status(500).json({
-      message: 'An error occurred during login.',
+      message: "An error occurred during login.",
       success: false,
     });
   }
 };
 
-
 const getProfileController = async (req, res) => {
   try {
-    const {uniqueKey, token} = req.query; // Expecting the uniqueKey in the request params
- 
-         console.log(uniqueKey, token)
-    
-        // Find employee by unique key
+    const { uniqueKey, token } = req.query; // Expecting the uniqueKey in the request params
+
+    console.log(uniqueKey, token);
+
+    // Find employee by unique key
     const employee = await Employee.findOne({ uniqueKey });
 
     if (!employee) {
       return res.status(404).json({
-        message: 'Employee not found.',
+        message: "Employee not found.",
         success: false,
       });
     }
 
     res.status(200).json({
-      message: 'Employee profile fetched successfully.',
+      message: "Employee profile fetched successfully.",
       success: true,
       data: employee,
     });
   } catch (error) {
-    console.error('Error fetching profile:', error);
+    console.error("Error fetching profile:", error);
     res.status(500).json({
-      message: 'An error occurred while fetching the profile.',
+      message: "An error occurred while fetching the profile.",
       success: false,
     });
   }
 };
 
-
-
 // Controller to update employee profile
 const updateProfileController = async (req, res) => {
   try {
     const { uniqueKey } = req.params; // Expecting uniqueKey in the request params
-    const { firstName, lastName, email, phoneNumber, shift, branch, salaryBased, hourlyWages, salary } = req.body;
+    const {
+      firstName,
+      lastName,
+      email,
+      phoneNumber,
+      shift,
+      branch,
+      salaryBased,
+      hourlyWages,
+      salary,
+    } = req.body;
 
     // Find employee by uniqueKey
     const employee = await Employee.findOne({ uniqueKey });
 
     if (!employee) {
       return res.status(404).json({
-        message: 'Employee not found.',
+        message: "Employee not found.",
         success: false,
       });
     }
@@ -424,8 +434,10 @@ const updateProfileController = async (req, res) => {
     employee.phoneNumber = phoneNumber || employee.phoneNumber;
     employee.shift = shift || employee.shift;
     employee.branch = branch || employee.branch;
-    employee.salaryBased = salaryBased !== undefined ? salaryBased : employee.salaryBased;
-    employee.hourlyWages = hourlyWages !== undefined ? hourlyWages : employee.hourlyWages;
+    employee.salaryBased =
+      salaryBased !== undefined ? salaryBased : employee.salaryBased;
+    employee.hourlyWages =
+      hourlyWages !== undefined ? hourlyWages : employee.hourlyWages;
     employee.salary = salary !== undefined ? salary : employee.salary;
 
     // Recalculate total salary if needed
@@ -435,19 +447,18 @@ const updateProfileController = async (req, res) => {
     await employee.save();
 
     res.status(200).json({
-      message: 'Employee profile updated successfully.',
+      message: "Employee profile updated successfully.",
       success: true,
       data: employee,
     });
   } catch (error) {
-    console.error('Error updating profile:', error);
+    console.error("Error updating profile:", error);
     res.status(500).json({
-      message: 'An error occurred while updating the profile.',
+      message: "An error occurred while updating the profile.",
       success: false,
     });
   }
 };
-
 
 // Controller to delete employee profile
 const deleteProfileController = async (req, res) => {
@@ -459,44 +470,49 @@ const deleteProfileController = async (req, res) => {
 
     if (!employee) {
       return res.status(404).json({
-        message: 'Employee not found.',
+        message: "Employee not found.",
         success: false,
       });
     }
 
     res.status(200).json({
-      message: 'Employee profile deleted successfully.',
+      message: "Employee profile deleted successfully.",
       success: true,
     });
   } catch (error) {
-    console.error('Error deleting profile:', error);
+    console.error("Error deleting profile:", error);
     res.status(500).json({
-      message: 'An error occurred while deleting the profile.',
+      message: "An error occurred while deleting the profile.",
       success: false,
     });
   }
 };
-
 
 // Controller to handle logout
 const logoutController = (req, res) => {
   try {
     // Clear the authToken from cookies
-    res.clearCookie('authToken');
+    res.clearCookie("authToken");
 
     // Respond with success
     res.status(200).json({
-      message: 'Logout successful.',
+      message: "Logout successful.",
       success: true,
     });
   } catch (error) {
-    console.error('Error during logout:', error);
+    console.error("Error during logout:", error);
     res.status(500).json({
-      message: 'An error occurred during logout.',
+      message: "An error occurred during logout.",
       success: false,
     });
   }
 };
 
-
-module.exports = { addEmployeeController ,employeeLoginController,getProfileController,updateProfileController,deleteProfileController,logoutController};
+module.exports = {
+  addEmployeeController,
+  employeeLoginController,
+  getProfileController,
+  updateProfileController,
+  deleteProfileController,
+  logoutController,
+};
